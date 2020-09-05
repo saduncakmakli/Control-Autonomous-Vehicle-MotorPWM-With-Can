@@ -82,7 +82,7 @@ void loop()
     {
       canHizOlcum = map(buf[1], 0, 255, 0, 60); //0-255 arasında gelen olcum sinyalini 0-60km/h arasında ölçekler.
     }
-    else if (canId == 324)//Motor hız hedef bilgisi
+    else if (canId == 150)//Motor hız hedef bilgisi
     {
       canHedefHiz = map(buf[1], 0, 255, 0, 60); //0-255 arasında gelen hedef sinyalini 0-60km/h arasında ölçekler.
       PID_Hesapla(canHedefHiz, canHizOlcum, 255, 0);
