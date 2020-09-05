@@ -17,12 +17,15 @@ MCP_CAN CAN(spiCSPin);
 const int motorPWM = 9;
 
 //PID DEFINITION
-void PID_Hesapla(float control_in, float control_now, unsigned int positive_PID_value_map_range, unsigned int negative_PID_value_map_range);
+void PID_Hesapla(float target, float control_now, unsigned int positive_PID_value_map_range, unsigned int negative_PID_value_map_range);
 float error = 0;
 float last_error = 0;
 float P = 0;
 float I = 0;
 float D = 0;
+
+short canHizOlcum = 0;
+short canHedefHiz = 0;
 
 const int multiple_max = 100;
 const double P_max = multiple_max * 10.0;
@@ -48,18 +51,51 @@ void setup()
     Serial.println("CAN BUS Init Failed");
     delay(100);
   }
-  Serial.println("CAN BUS  Init OK!");
+  Serial.println("CAN BUS Init OK!");
 }
 
 void loop() 
 {
-  
+  //CANDAN OKUMA BOLUMU
+  unsigned char len = 0;
+  unsigned char buf[8];
+
+  if (CAN_MSGAVAIL == CAN.checkReceive())
+  {
+    CAN.readMsgBuf(&len, buf);
+
+    unsigned long canId = CAN.getCanId();
+
+    Serial.println("-----------------------------");
+    Serial.print("Data from ID: 0x");
+    Serial.println(canId, HEX);
+
+    for (int i = 0; i < len; i++)
+    {
+      Serial.print(buf[i]);
+      Serial.print(" | ");
+    }
+    Serial.println();
+
+    //GELEN OLCUM VE HEDEF HIZ VERISINE GORE MOTOR KONTROL
+    if (canId == 240) //Motor hız olcum bilgisi
+    {
+      canHizOlcum = map(buf[1], 0, 255, 0, 60); //0-255 arasında gelen olcum sinyalini 0-60km/h arasında ölçekler.
+    }
+    else if (canId == 324)//Motor hız hedef bilgisi
+    {
+      canHedefHiz = map(buf[1], 0, 255, 0, 60); //0-255 arasında gelen hedef sinyalini 0-60km/h arasında ölçekler.
+      PID_Hesapla(canHedefHiz, canHizOlcum, 255, 0);
+      if (PID < 0) PID = 0;
+      analogWrite(motorPWM,PID);
+    }
+  }
 }
 
-void PID_Hesapla(float control_in, float control_now, unsigned int positive_PID_value_map_range, unsigned int negative_PID_value_map_range)
+void PID_Hesapla(float target, float control_now, unsigned int positive_PID_value_map_range, unsigned int negative_PID_value_map_range)
 {
   last_error = error;
-  error = control_in - control_now; //PID ile kontrol edilecek değişken control now
+  error = target - control_now; //PID ile kontrol edilecek değişken control now
 
   P = KP * error; //Oransal Kontrol
   if (P > P_max)
